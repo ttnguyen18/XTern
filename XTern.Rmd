@@ -1,0 +1,119 @@
+---
+title: "XTern 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Getting packages
+
+The packages that are gonna be used are tidyverse, leaflet, geosphere, ggplot2, and tidy text, which will assist in cleaning, processing and modeling the data, creating graphs and interactive map, and text mining.
+
+```{r packages, echo=TRUE}
+#install.packages('tidyverse')
+#install.packages('leaflet')
+#install.packages('geosphere')
+#install.packages('ggplot2')
+#install.packages('tidytext')
+library(tidyverse)
+library(leaflet)
+library(geosphere)
+library(ggplot2)
+library(tidytext)
+```
+
+## Getting and cleaning data
+
+There are some restaurants that do not have ratings and reviews, either because they just open or there is insufficient information. Those cells will be replaced by N/A and the Ratings and Reviews columns are also converted to numeric for easier work.
+
+```{r cleaning, echo=TRUE}
+restaurant_data <- read.csv(file='~/Desktop/2020-XTern-DS.csv', header=TRUE, sep=',') 
+restaurant_data$Rating <- str_replace(restaurant_data$Rating, 'NEW', NA_character_)
+restaurant_data$Rating <- str_replace(restaurant_data$Rating, '-', NA_character_)
+restaurant_data$Reviews <- str_replace(restaurant_data$Reviews, '-', NA_character_)
+restaurant_data$Rating <- as.numeric((restaurant_data$Rating))
+restaurant_data$Reviews <- as.numeric((restaurant_data$Reviews))
+```
+
+## 1. Top 20 Most Popular Restaurants:
+
+The scoring algorithm used to rank the restaurants takes into account the ratings and number of reviews of each restaurant and uses the True Bayesian Estimate method. This method will account for situations such as when a restaurant has a high rating but very few number of reviews, which will not be as reliable as a restaurant having a lower rating but a lot of reviews. The method uses the formula: 
+
+weighted rating (WR) = (v ÷ (v+m)) × R + (m ÷ (v+m)) × C where:
+
+R = Rating
+
+v = number of reviews
+
+m = minimum reviews required
+
+C = the mean rating across the whole report
+
+I will choose the minimum reviews required as 20 which is reasonable for a restaurant. Cells with N/A value will not be considered in the calculation.
+
+```{r popular, echo=TRUE}
+C <- mean(restaurant_data$Rating, na.rm=TRUE)
+m <- 20
+w <- restaurant_data$Reviews/(restaurant_data$Reviews + m)
+restaurant_data$Score <- w*restaurant_data$Rating + (1-w)*C
+x = restaurant_data[order(restaurant_data$Score, decreasing= T),]
+top20 <- head(x, 20)
+top20$Restaurant
+barplot(top20$Score, main="Top 20 Popular Restaurants", names.arg=as.character(top20$Restaurant))
+```
+
+Top 20 Restaurant IDs are shown together with a barplot of their weighted score.
+
+## 2. Clustering Locations:
+
+Restaurants are clustered into 10 clusters using kmeans clustering method and based on their longitude and latitude data. The graph shows the clusters in different colors.
+
+```{r clutering, echo=TRUE}
+cdat <- data.frame(restaurant_data$Latitude, restaurant_data$Longitude)
+clusters <- kmeans(cdat, 10)
+clusters
+plot(cdat, col = clusters$cluster)
+points(clusters$centers, col = 1:4, pch = 8, cex = 2)
+cluster_center <- data.frame(clusters$centers)
+```
+
+## 3. Interactive Map:
+
+An interactive map is created with each restaurant as a circle marker on the map based on their location, and the color of the circle marker is based on their weighted score with information in the legend on the right of the map. Restaurants with N/A value for their score will have grey circle markers. The clusters are also shown on the map using the centroid as the center and a radius of 15000. Top 20 popular restaurants are represented by the marker and when clicking on the marker their ID will be shown.
+
+```{r map, echo=TRUE}
+pal = colorNumeric("YlOrRd", domain = restaurant_data$Score)
+int_map <- leaflet(restaurant_data)%>%
+  addProviderTiles(providers$OpenStreetMap.Mapnik)%>%
+  addCircleMarkers(lng=restaurant_data$Longitude, lat=restaurant_data$Latitude, col = ~pal(restaurant_data$Score), opacity = 1.1, radius = 0.3, popup=restaurant_data$Restaurant)%>%
+  addCircles(lng=cluster_center$restaurant_data.Longitude, lat=cluster_center$restaurant_data.Latitude, radius = 15000)%>%
+  addMarkers(lng=top20$Longitude, lat=top20$Latitude, popup = top20$Restaurant)%>%
+  addLegend(pal = pal, values = ~restaurant_data$Score, title = 'Restaurant Weighted Score') 
+int_map
+```
+
+## 4. Most Popular Cuisines:
+
+Using text mining, the cuisines of each restaurant are seprated and the graph shows the top 10 most popular cuisines with the number of restaurants serving them.
+
+```{r cuisines, echo=TRUE}
+attach(restaurant_data)
+popular_cuisine   <- restaurant_data %>% 
+  dplyr::select(Restaurant, Cuisines)%>%
+  mutate(Cuisines = as.character(restaurant_data$Cuisines)) %>%
+  unnest_tokens(Cuisine, Cuisines, token = 'regex', pattern=",") %>%
+  unique() %>%
+  group_by(trimws(Cuisine)) %>%                  
+  summarise(Number_of_Restaurant = n()) %>%
+  arrange(desc(Number_of_Restaurant)) %>%
+  top_n(10) 
+names(popular_cuisine)[1] <- 'Cuisine'
+Popular_Cuisine_Plot <- ggplot(popular_cuisine, aes(x = reorder(Cuisine, Number_of_Restaurant), y = Number_of_Restaurant)) +
+  geom_bar(stat = 'identity', fill='pink') +
+  coord_flip() + theme(panel.background = element_blank(), strip.background = element_blank(), 
+                       plot.title = element_text(hjust = 0.5, face = 'bold',color = 'black')) +
+  labs(x = 'Cuisines', y = 'Number of Restaurants', title = "Popular Cuisines")
+Popular_Cuisine_Plot
+```
