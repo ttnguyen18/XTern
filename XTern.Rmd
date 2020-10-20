@@ -12,11 +12,6 @@ knitr::opts_chunk$set(echo = TRUE)
 The packages that are gonna be used are tidyverse, leaflet, geosphere, ggplot2, and tidy text, which will assist in cleaning, processing and modeling the data, creating graphs and interactive map, and text mining.
 
 ```{r packages, echo=TRUE}
-#install.packages('tidyverse')
-#install.packages('leaflet')
-#install.packages('geosphere')
-#install.packages('ggplot2')
-#install.packages('tidytext')
 library(tidyverse)
 library(leaflet)
 library(geosphere)
@@ -29,7 +24,7 @@ library(tidytext)
 There are some restaurants that do not have ratings and reviews, either because they just open or there is insufficient information. Those cells will be replaced by N/A and the Ratings and Reviews columns are also converted to numeric for easier work.
 
 ```{r cleaning, echo=TRUE}
-restaurant_data <- read.csv(file='~/Desktop/2020-XTern-DS.csv', header=TRUE, sep=',') 
+restaurant_data <- read.csv(file='2020-XTern-DS.csv', header=TRUE, sep=',') 
 restaurant_data$Rating <- str_replace(restaurant_data$Rating, 'NEW', NA_character_)
 restaurant_data$Rating <- str_replace(restaurant_data$Rating, '-', NA_character_)
 restaurant_data$Reviews <- str_replace(restaurant_data$Reviews, '-', NA_character_)
